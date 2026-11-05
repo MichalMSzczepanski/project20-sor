@@ -1,0 +1,78 @@
+[
+  {
+    "id_gsl_miej": "",
+    "nazwa_swd": "REGIONALNE CENTRUM ZDROWIA SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ",
+    "adr_siedz_kod_poczt": "",
+    "adr_siedz_miejsc": "",
+    "adr_siedz_ulica": "",
+    "adr_siedz_nr_domu": "",
+    "adr_siedz_nr_lokalu": "",
+    "nazwa_miejsca": "Szpitalny Odział Ratunkowy",
+    "adr_lok_kod_poczt": "59-300",
+    "adr_lok_miejsc": "Lubin",
+    "adr_lok_ulica": "Gen.Józefa Bema",
+    "adr_lok_nr_domu": "5/6",
+    "adr_lok_nr_lokalu": "",
+    "telefon_rej": "76 840 15 81",
+    "mail": "",
+    "lat": 51.40065,
+    "lng": 16.19794,
+    "harm_pon": "",
+    "harm_wt": "",
+    "harm_sr": "",
+    "harm_czw": "",
+    "harm_pt": "",
+    "harm_sob": "",
+    "harm_niedz": "",
+    "strona_www_podmiotu": "",
+    "uwagi": "całodobowo",
+    "naglowek": "",
+    "Rzecznik Praw Pacjenta Szpitala Psychiatrycznego": "",
+    "telefon  do RzSzP": "",
+    "adres e-mail do RzSzP": "",
+    "zakreś świadczeń": "",
+    "Centrum Zdrowia Psychicznego": "",
+    "Województwo": "Dolnośląskie",
+    "Powiat": "",
+    "numer_ksiegi": "000000025802-079",
+    "": ""
+  },
+  {
+    "nazwa_swd": "ZESPÓŁ OPIEKI ZDROWOTNEJ W BOLESŁAWCU",
+    "nazwa_miejsca": "Szpitalny Odział Ratunkowy",
+    "adr_lok_kod_poczt": "59-700",
+    "adr_lok_miejsc": "BOLESŁAWIEC",
+    "adr_lok_ulica": "Jeleniogórska",
+    "adr_lok_nr_domu": "4",
+    "adr_lok_nr_lokalu": "",
+    "telefon_rej": "",
+    "uwagi": "",
+    "lat": 51.25449,
+    "lng": 15.56694,
+    "Województwo": "Dolnośląskie",
+    "numer_ksiegi": " 000000001137-014 "
+  },
+  {
+    "nazwa_swd": "TEST: WPIS BEZ NUMERU KSIĘGI",
+    "lat": 52.0,
+    "lng": 21.0,
+    "numer_ksiegi": ""
+  },
+  {
+    "nazwa_swd": "TEST: WPIS BEZ WSPÓŁRZĘDNYCH",
+    "numer_ksiegi": "000000099999-001"
+  },
+  {
+    "nazwa_swd": "TEST: WSPÓŁRZĘDNE JAKO TEKST (jak w źródle 05.11.2026)",
+    "adr_lok_miejsc": "Test",
+    "lat": "52.2588",
+    "lng": "19.1853588,",
+    "numer_ksiegi": "000000000001-001"
+  },
+  {
+    "nazwa_swd": {"to": "nie tekst"},
+    "lat": 52.0,
+    "lng": 21.0,
+    "numer_ksiegi": "000000000002-001"
+  }
+]

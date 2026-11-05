@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="pl">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Najbliższy SOR</title>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+	<style>
+		:root {
+			--bg: #f6f7f9; --card: #fff; --text: #1c2430; --muted: #5b6676; --border: #dde2e8;
+			--accent: #c62828; --ok: #2e7d32; --warn: #b26a00;
+		}
+		@media (prefers-color-scheme: dark) {
+			:root {
+				--bg: #12161c; --card: #1b2129; --text: #e7ebf0; --muted: #9aa5b4; --border: #2c3440;
+				--accent: #ef5350; --ok: #66bb6a; --warn: #ffb74d;
+			}
+		}
+		* { box-sizing: border-box; }
+		body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+		header { padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--card); }
+		h1 { margin: 0 0 4px; font-size: 20px; }
+		.emergency { margin: 0; color: var(--accent); font-weight: 600; }
+		.controls { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px; align-items: center; }
+		button, select { font: inherit; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); }
+		button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+		#status { color: var(--muted); }
+		main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 0 16px 16px; }
+		@media (min-width: 900px) { main { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); height: calc(100vh - 140px); } #list { overflow-y: auto; } }
+		#map { height: 50vh; min-height: 300px; border-radius: 10px; border: 1px solid var(--border); }
+		@media (min-width: 900px) { #map { height: 100%; order: 2; } }
+		.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+		.card h2 { margin: 0; font-size: 16px; }
+		.meta { color: var(--muted); font-size: 13px; }
+		.times { display: flex; gap: 16px; margin: 8px 0; flex-wrap: wrap; }
+		.times b { display: block; font-size: 18px; }
+		.badge { font-size: 12px; padding: 2px 6px; border-radius: 6px; border: 1px solid currentColor; }
+		.fresh { color: var(--ok); } .stale { color: var(--warn); } .nodata { color: var(--muted); }
+		details { font-size: 13px; } table { border-collapse: collapse; } td { padding: 1px 10px 1px 0; }
+		a { color: inherit; }
+		h3.section { margin: 18px 0 2px; font-size: 15px; }
+		.section-note { margin: 0 0 8px; }
+	</style>
+</head>
+<body>
+<header>
+	<h1>Najbliższy SOR — gdzie najszybciej trafisz do lekarza</h1>
+	<p class="emergency">Zagrożenie życia? Dzwoń 112 — nie jedź sam.</p>
+</header>
+<div class="controls">
+	<button class="primary" id="locate">📍 Użyj mojej lokalizacji</button>
+	<label>Priorytet z triażu:
+		<select id="priority">
+			<option value="">nie wiem</option>
+			<option value="HIGHEST">najwyższy</option>
+			<option value="HIGH">wysoki</option>
+			<option value="MEDIUM">średni</option>
+			<option value="LOW">niski</option>
+			<option value="LOWEST">najniższy</option>
+		</select>
+	</label>
+	<span id="status">Albo kliknij miejsce na mapie.</span>
+</div>
+<main>
+	<div id="map"></div>
+	<div id="list"></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+	const map = L.map('map').setView([52.07, 19.48], 6);
+	L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+		maxZoom: 18, attribution: '&copy; OpenStreetMap'
+	}).addTo(map);
+	const markers = L.layerGroup().addTo(map);
+	const statusEl = document.getElementById('status');
+	const listEl = document.getElementById('list');
+	const priorityEl = document.getElementById('priority');
+	let origin = null;
+
+	const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'})[c]);
+	const minutes = (m, atLeast) => m == null ? '?' : (atLeast ? '≥ ' : '') + (m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`);
+	// Źródło potrafi podać kilka numerów w jednym polu: "22 473 53 33, 22 473 53 32".
+	const phones = (raw) => (raw || '').split(/[,;]/).map((p) => p.trim()).filter(Boolean)
+		.map((p) => ` · <a href="tel:${esc(p.replace(/[^\d+]/g, ''))}">${esc(p)}</a>`).join('');
+	const ago = (iso) => iso ? Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000)) + ' min temu' : '';
+	const FRESHNESS = {
+		FRESH: ['fresh', 'dane aktualne'],
+		STALE: ['stale', 'dane nieaktualne'],
+		NO_DATA: ['nodata', 'brak danych o kolejce']
+	};
+
+	// Czas do lekarza: 0 przy znanym czasie znaczy, że w kolejce nikt nie czeka — nie obiecujemy „0 min”.
+	const wait = (s) => s.waitMinutes === 0 && !s.waitAtLeast ? 'brak kolejki' : minutes(s.waitMinutes, s.waitAtLeast);
+	const travelLabel = (s) => s.travelMethod === 'ROAD'
+		? `Dojazd (${s.distanceKm} km drogą)`
+		: `Dojazd (~${s.distanceKm} km, zgrubnie)`;
+
+	async function load() {
+		if (!origin) return;
+		statusEl.textContent = 'Szukam…';
+		const params = new URLSearchParams({lat: origin.lat, lng: origin.lng, limit: 10});
+		if (priorityEl.value) params.set('priority', priorityEl.value);
+		try {
+			const res = await fetch('/api/sor/nearest?' + params);
+			if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+			const data = await res.json();
+			render(data);
+			const all = [...data.ranked, ...data.withoutData];
+			statusEl.textContent = 'Kolejność: dojazd + czas do lekarza. '
+				+ (all.some((s) => s.travelMethod === 'STRAIGHT_LINE')
+					? 'Część dojazdów liczona zgrubnie z odległości (serwis tras nie odpowiedział).'
+					: 'Dojazd po drogach, bez uwzględnienia korków.');
+		} catch (e) {
+			statusEl.textContent = 'Błąd: ' + e.message;
+		}
+	}
+
+	function card(s, title) {
+		const [cls, label] = FRESHNESS[s.freshness];
+		const stages = s.stages.map((st) => `<tr><td>${esc(st.name)}</td><td>${st.patients ?? '?'} os.</td><td>${esc(st.waitText)}</td></tr>`).join('');
+		return `<article class="card">
+			<h2>${title}</h2>
+			<div class="meta">${esc(s.address)}${s.notes ? ' · ' + esc(s.notes) : ''}</div>
+			<div class="times">
+				${s.totalMinutes != null ? `<div><span class="meta">Łącznie</span><b>${minutes(s.totalMinutes, s.waitAtLeast)}</b></div>` : ''}
+				<div><span class="meta">${travelLabel(s)}</span><b>${minutes(s.travelMinutes)}</b></div>
+				${s.totalMinutes != null ? `<div><span class="meta">Do lekarza</span><b>${wait(s)}</b></div>` : ''}
+				<div><span class="meta">Pacjentów na SOR</span><b>${s.patientsPresent ?? '?'}</b></div>
+			</div>
+			<span class="badge ${cls}">${label}${s.dataGeneratedAt ? ' · ' + ago(s.dataGeneratedAt) : ''}</span>
+			${s.lastError ? `<span class="meta"> ostatni błąd: ${esc(s.lastError)}</span>` : ''}
+			${stages ? `<details><summary>Etapy kolejki</summary><table>${stages}</table></details>` : ''}
+			<div class="meta">
+				<a href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}" target="_blank" rel="noopener">Nawiguj</a>
+				${phones(s.phone)}
+			</div>
+		</article>`;
+	}
+
+	function render({ranked, withoutData}) {
+		markers.clearLayers();
+		L.circleMarker([origin.lat, origin.lng], {radius: 7, color: '#1565c0'}).addTo(markers).bindTooltip('Ty');
+		let html = ranked.map((s, i) => card(s, `${i + 1}. ${esc(s.hospitalName)}`)).join('');
+		if (withoutData.length) {
+			html += `<h3 class="section">${ranked.length
+				? 'Bliżej, ale bez aktualnych danych o kolejce'
+				: 'Brak aktualnych danych o kolejkach — najbliższe SOR'}</h3>`
+				+ '<p class="meta section-note">Nie wiemy, ile się tam czeka. Przed wyjazdem warto zadzwonić.</p>'
+				+ withoutData.map((s) => card(s, esc(s.hospitalName))).join('');
+		}
+		listEl.innerHTML = html || '<p class="meta">Nie znaleziono SOR w pobliżu.</p>';
+		ranked.forEach((s, i) => L.marker([s.lat, s.lng]).addTo(markers)
+			.bindTooltip(`${i + 1}. ${esc(s.hospitalName)} — ${minutes(s.totalMinutes, s.waitAtLeast)}`));
+		withoutData.forEach((s) => L.circleMarker([s.lat, s.lng], {radius: 8, color: '#888', fillOpacity: 0.5}).addTo(markers)
+			.bindTooltip(`${esc(s.hospitalName)} — brak aktualnych danych`));
+		const focus = [...ranked.slice(0, 5), ...withoutData.slice(0, 3)];
+		if (focus.length) map.fitBounds(L.latLngBounds([[origin.lat, origin.lng], ...focus.map((s) => [s.lat, s.lng])]).pad(0.2));
+	}
+
+	document.getElementById('locate').addEventListener('click', () => {
+		if (!navigator.geolocation) { statusEl.textContent = 'Przeglądarka nie udostępnia lokalizacji — kliknij na mapie.'; return; }
+		statusEl.textContent = 'Ustalam lokalizację…';
+		navigator.geolocation.getCurrentPosition(
+			(p) => { origin = {lat: p.coords.latitude, lng: p.coords.longitude}; load(); },
+			() => { statusEl.textContent = 'Nie udało się ustalić lokalizacji — kliknij na mapie.'; },
+			{enableHighAccuracy: true, timeout: 10000});
+	});
+	map.on('click', (e) => { origin = {lat: e.latlng.lat, lng: e.latlng.lng}; load(); });
+	priorityEl.addEventListener('change', load);
+</script>
+</body>
+</html>
