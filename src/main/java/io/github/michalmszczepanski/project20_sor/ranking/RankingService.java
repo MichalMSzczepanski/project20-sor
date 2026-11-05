@@ -71,24 +71,40 @@ public class RankingService {
 				.mapToObj(i -> rank(candidates.get(i), travel.get(i), priority, now))
 				.toList();
 
-		List<SorRanking> ranked = all.stream()
-				.filter(r -> r.waitEstimate().isUsable())
+		// Minuta jazdy to nie to samo co minuta czekania: kolejka zmieni się, zanim dojedziemy, a chory i tak jest
+		// w drodze. Dlatego ranking obejmuje SOR najwyżej maxExtraTravel dalej niż najbliższy z danymi.
+		List<SorRanking> usable = all.stream().filter(r -> r.waitEstimate().isUsable()).toList();
+		int nearestTravel = usable.stream().mapToInt(SorRanking::travelMinutes).min().orElse(0);
+		long reach = nearestTravel + config.maxExtraTravel().toMinutes();
+		List<SorRanking> ranked = usable.stream()
+				.filter(r -> r.travelMinutes() <= reach)
 				.sorted(SorRanking.SHORTEST_TOTAL)
 				.limit(limit)
 				.toList();
-		int horizon = ranked.stream().mapToInt(SorRanking::travelMinutes).max().orElse(Integer.MAX_VALUE);
+		int bestTotal = ranked.isEmpty() ? Integer.MAX_VALUE : ranked.get(0).totalMinutes().orElseThrow();
+		long fartherMustBeBelow = bestTotal - config.minSavingForFarther().toMinutes();
+		List<SorRanking> fartherFaster = usable.stream()
+				.filter(r -> r.travelMinutes() > reach && r.totalMinutes().orElseThrow() < fartherMustBeBelow)
+				.sorted(SorRanking.SHORTEST_TOTAL)
+				.limit(config.maxFarther())
+				.toList();
+		// SOR bez danych pokazujemy w tym samym zasięgu co ranking — żeby nie przeoczyć bliskiego SOR tylko dlatego,
+		// że nie raportuje kolejki. Bez żadnych danych w okolicy: po prostu najbliższe.
+		long horizon = ranked.isEmpty() ? Long.MAX_VALUE : reach;
 		List<SorRanking> withoutData = all.stream()
-				.filter(r -> !r.waitEstimate().isUsable() && r.travelMinutes() < horizon)
+				.filter(r -> !r.waitEstimate().isUsable() && r.travelMinutes() <= horizon)
 				.sorted(SorRanking.SHORTEST_TRAVEL)
 				.limit(ranked.isEmpty() ? limit : config.maxWithoutData())
 				.toList();
-		return new Recommendation(ranked, withoutData, sorTypes.isLoaded());
+		return new Recommendation(ranked, withoutData, fartherFaster, sorTypes.isLoaded());
 	}
 
 	private SorRanking rank(SorUnit unit, TravelEstimate travel, TriagePriority priority, Instant now) {
 		Optional<QueueState> queue = queues.find(unit.queueId());
-		WaitEstimate wait = waitEstimator.estimate(queue.flatMap(QueueState::latestSnapshot), priority, now);
-		return new SorRanking(unit, sorTypes.typeOf(unit.queueId()), travel, wait, queue);
+		WaitEstimate wait = queue.flatMap(QueueState::latestSnapshot)
+				.map(snapshot -> waitEstimator.estimate(snapshot, priority, now))
+				.orElse(WaitEstimate.NO_DATA);
+		return new SorRanking(unit, sorTypes.typeOf(unit.queueId()), travel, wait, queue.orElse(null));
 	}
 
 }

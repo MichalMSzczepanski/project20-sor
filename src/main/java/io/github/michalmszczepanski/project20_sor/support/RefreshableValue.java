@@ -21,7 +21,12 @@ public final class RefreshableValue<T> {
 	}
 
 	public void set(T value) {
-		loaded = new Loaded<>(value, clock.instant());
+		set(value, clock.instant());
+	}
+
+	/** Wartość wczytana wcześniej (np. z pliku) — z jej prawdziwym czasem wczytania. */
+	public void set(T value, Instant loadedAt) {
+		loaded = new Loaded<>(value, loadedAt);
 		failure = null;
 	}
 

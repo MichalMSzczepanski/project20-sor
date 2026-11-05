@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.Trigger;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.SchedulingConfigurer;
-import org.springframework.scheduling.config.FixedDelayTask;
+import org.springframework.scheduling.config.FixedRateTask;
 import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 
 import io.github.michalmszczepanski.project20_sor.catalog.SorCatalog;
@@ -43,7 +43,8 @@ class SchedulingConfig implements SchedulingConfigurer {
 				properties.catalog().refreshInterval(), properties.catalog().retryInterval()));
 		registrar.addTriggerTask(sorTypes::refresh, refreshTrigger(sorTypes::isLoaded,
 				properties.rpwdl().refreshInterval(), properties.rpwdl().retryInterval()));
-		registrar.addFixedDelayTask(new FixedDelayTask(poller::pollAll, properties.queue().pollInterval(),
+		// Stała częstotliwość, nie stała przerwa: przebieg sam trwa ~spreadOver, więc przerwa po nim wydłużałaby cykl.
+		registrar.addFixedRateTask(new FixedRateTask(poller::pollAll, properties.queue().pollInterval(),
 				properties.queue().initialDelay()));
 	}
 

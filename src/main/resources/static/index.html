@@ -4,182 +4,78 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>Najbliższy SOR</title>
-	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-	<style>
-		:root {
-			--bg: #f6f7f9; --card: #fff; --text: #1c2430; --muted: #5b6676; --border: #dde2e8;
-			--accent: #c62828; --ok: #2e7d32; --warn: #b26a00;
-		}
-		@media (prefers-color-scheme: dark) {
-			:root {
-				--bg: #12161c; --card: #1b2129; --text: #e7ebf0; --muted: #9aa5b4; --border: #2c3440;
-				--accent: #ef5350; --ok: #66bb6a; --warn: #ffb74d;
-			}
-		}
-		* { box-sizing: border-box; }
-		body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
-		header { padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--card); }
-		h1 { margin: 0 0 4px; font-size: 20px; }
-		.emergency { margin: 0; color: var(--accent); font-weight: 600; }
-		.controls { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px; align-items: center; }
-		button, select { font: inherit; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); }
-		button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
-		#status { color: var(--muted); }
-		main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 0 16px 16px; }
-		@media (min-width: 900px) { main { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); height: calc(100vh - 140px); } #list { overflow-y: auto; } }
-		#map { height: 50vh; min-height: 300px; border-radius: 10px; border: 1px solid var(--border); }
-		@media (min-width: 900px) { #map { height: 100%; order: 2; } }
-		.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
-		.card h2 { margin: 0; font-size: 16px; }
-		.meta { color: var(--muted); font-size: 13px; }
-		.times { display: flex; gap: 16px; margin: 8px 0; flex-wrap: wrap; }
-		.times b { display: block; font-size: 18px; }
-		.badge { font-size: 12px; padding: 2px 6px; border-radius: 6px; border: 1px solid currentColor; }
-		.kids { color: #6a1b9a; border-color: #6a1b9a; font-weight: 600; vertical-align: middle; }
-		@media (prefers-color-scheme: dark) { .kids { color: #ce93d8; border-color: #ce93d8; } }
-		.warning { margin: 0 0 10px; padding: 8px 10px; border: 1px solid var(--warn); border-radius: 8px; color: var(--warn); }
-		.fresh { color: var(--ok); } .stale { color: var(--warn); } .nodata { color: var(--muted); }
-		details { font-size: 13px; } table { border-collapse: collapse; } td { padding: 1px 10px 1px 0; }
-		a { color: inherit; }
-		h3.section { margin: 18px 0 2px; font-size: 15px; }
-		.section-note { margin: 0 0 8px; }
-	</style>
+	<meta name="description" content="Gdzie najszybciej trafisz do lekarza na SOR: dojazd i aktualne kolejki z pacjent.gov.pl.">
+	<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c62828'/%3E%3Cpath d='M13 7h6v6h6v6h-6v6h-6v-6H7v-6h6z' fill='white'/%3E%3C/svg%3E">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
+		integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw=="
+		crossorigin="anonymous" referrerpolicy="no-referrer">
+	<link rel="stylesheet" href="app.css">
 </head>
 <body>
-<header>
-	<h1>Najbliższy SOR — gdzie najszybciej trafisz do lekarza</h1>
-	<p class="emergency">Zagrożenie życia? Dzwoń 112 — nie jedź sam.</p>
-</header>
-<div class="controls">
-	<button class="primary" id="locate">📍 Użyj mojej lokalizacji</button>
-	<label>Pacjent:
-		<select id="patient">
-			<option value="ADULT">dorosły</option>
-			<option value="CHILD">dziecko</option>
-		</select>
-	</label>
-	<label>Priorytet z triażu:
-		<select id="priority">
-			<option value="">nie wiem</option>
-			<option value="HIGHEST">najwyższy</option>
-			<option value="HIGH">wysoki</option>
-			<option value="MEDIUM">średni</option>
-			<option value="LOW">niski</option>
-			<option value="LOWEST">najniższy</option>
-		</select>
-	</label>
-	<span id="status">Albo kliknij miejsce na mapie.</span>
+<div class="app">
+	<aside class="panel">
+		<header class="header">
+			<h1 class="brand"><span class="brand-mark" aria-hidden="true"></span>Najbliższy SOR</h1>
+			<a class="emergency" href="tel:112"><span class="emergency-extra">Zagrożenie życia? </span><strong>Dzwoń 112</strong></a>
+		</header>
+
+		<section class="controls" aria-label="Wyszukiwanie">
+			<button class="btn-primary" id="locate" type="button">
+				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a1 1 0 0 1 1 1v1.07A8 8 0 0 1 19.93 11H21a1 1 0 1 1 0 2h-1.07A8 8 0 0 1 13 19.930V21a1 1 0 1 1-2 0v-1.07A8 8 0 0 1 4.07 13H3a1 1 0 1 1 0-2h1.07A8 8 0 0 1 11 4.07V3a1 1 0 0 1 1-1Zm0 4a6 6 0 1 0 0 12 6 6 0 0 0 0-12Zm0 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"/></svg>
+				Użyj mojej lokalizacji
+			</button>
+			<form class="search" id="search" role="search" autocomplete="off">
+				<label class="visually-hidden" for="address">Adres</label>
+				<input type="search" id="address" name="q" placeholder="albo wpisz adres, np. Bursztynowa 2, Warszawa"
+					minlength="3" maxlength="200" enterkeyhint="search">
+				<button type="submit" class="btn-secondary">Szukaj</button>
+				<ul class="suggestions" id="suggestions" role="listbox" aria-label="Znalezione adresy" hidden></ul>
+			</form>
+			<div class="filters">
+				<div class="segmented" role="radiogroup" aria-label="Pacjent">
+					<label><input type="radio" name="patient" value="ADULT" checked><span>Dorosły</span></label>
+					<label><input type="radio" name="patient" value="CHILD"><span>Dziecko</span></label>
+				</div>
+				<label class="select">
+					<span>Priorytet z triażu</span>
+					<select id="priority">
+						<option value="">nie wiem</option>
+						<option value="HIGHEST">najwyższy</option>
+						<option value="HIGH">wysoki</option>
+						<option value="MEDIUM">średni</option>
+						<option value="LOW">niski</option>
+						<option value="LOWEST">najniższy</option>
+					</select>
+				</label>
+			</div>
+		</section>
+
+		<div class="status" id="status" role="status" aria-live="polite"></div>
+		<div class="list" id="list"></div>
+
+		<footer class="footer">
+			Kolejki: <a href="https://pacjent.gov.pl/szpitalny-oddzial-ratunkowy-sor" target="_blank" rel="noopener">pacjent.gov.pl</a>
+			· rodzaje SOR: RPWDL · trasy autem: OSRM · komunikacja:
+			<a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous</a>
+			· adresy: OpenStreetMap Nominatim
+		</footer>
+	</aside>
+	<main class="map-wrap">
+		<div id="map" aria-label="Mapa SOR"></div>
+	</main>
 </div>
-<main>
-	<div id="map"></div>
-	<div id="list"></div>
-</main>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script>
-	const map = L.map('map').setView([52.07, 19.48], 6);
-	L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-		maxZoom: 18, attribution: '&copy; OpenStreetMap'
-	}).addTo(map);
-	const markers = L.layerGroup().addTo(map);
-	const statusEl = document.getElementById('status');
-	const listEl = document.getElementById('list');
-	const priorityEl = document.getElementById('priority');
-	const patientEl = document.getElementById('patient');
-	let origin = null;
 
-	const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'})[c]);
-	const minutes = (m, atLeast) => m == null ? '?' : (atLeast ? '≥ ' : '') + (m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`);
-	// Źródło potrafi podać kilka numerów w jednym polu: "22 473 53 33, 22 473 53 32".
-	const phones = (raw) => (raw || '').split(/[,;]/).map((p) => p.trim()).filter(Boolean)
-		.map((p) => ` · <a href="tel:${esc(p.replace(/[^\d+]/g, ''))}">${esc(p)}</a>`).join('');
-	const ago = (iso) => iso ? Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000)) + ' min temu' : '';
-	const FRESHNESS = {
-		FRESH: ['fresh', 'dane aktualne'],
-		STALE: ['stale', 'dane nieaktualne'],
-		NO_DATA: ['nodata', 'brak danych o kolejce']
-	};
+<template id="intro">
+	<div class="intro">
+		<p class="intro-title">Gdzie najszybciej trafisz do lekarza?</p>
+		<p>Pokażemy SOR uszeregowane według łącznego czasu: dojazdu po drogach i aktualnej kolejki do lekarza.</p>
+		<p class="muted">Użyj lokalizacji, wpisz adres albo kliknij miejsce na mapie.</p>
+	</div>
+</template>
 
-	// Czas do lekarza: 0 przy znanym czasie znaczy, że w kolejce nikt nie czeka — nie obiecujemy „0 min”.
-	const wait = (s) => s.waitMinutes === 0 && !s.waitAtLeast ? 'brak kolejki' : minutes(s.waitMinutes, s.waitAtLeast);
-	const travelLabel = (s) => s.travelMethod === 'ROAD'
-		? `Dojazd (${s.distanceKm} km drogą)`
-		: `Dojazd (~${s.distanceKm} km, zgrubnie)`;
-
-	async function load() {
-		if (!origin) return;
-		statusEl.textContent = 'Szukam…';
-		const params = new URLSearchParams({lat: origin.lat, lng: origin.lng, limit: 10, patient: patientEl.value});
-		if (priorityEl.value) params.set('priority', priorityEl.value);
-		try {
-			const res = await fetch('/api/sor/nearest?' + params);
-			if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
-			const data = await res.json();
-			render(data);
-			const all = [...data.ranked, ...data.withoutData];
-			statusEl.textContent = 'Kolejność: dojazd + czas do lekarza. '
-				+ (all.some((s) => s.travelMethod === 'STRAIGHT_LINE')
-					? 'Część dojazdów liczona zgrubnie z odległości (serwis tras nie odpowiedział).'
-					: 'Dojazd po drogach, bez uwzględnienia korków.');
-		} catch (e) {
-			statusEl.textContent = 'Błąd: ' + e.message;
-		}
-	}
-
-	function card(s, title) {
-		const [cls, label] = FRESHNESS[s.freshness];
-		const stages = s.stages.map((st) => `<tr><td>${esc(st.name)}</td><td>${st.patients ?? '?'} os.</td><td>${esc(st.waitText)}</td></tr>`).join('');
-		return `<article class="card">
-			<h2>${title}${s.sorType === 'PEDIATRIC' ? ' <span class="badge kids">SOR dla dzieci</span>' : ''}</h2>
-			<div class="meta">${esc(s.address)}${s.notes ? ' · ' + esc(s.notes) : ''}</div>
-			<div class="times">
-				${s.totalMinutes != null ? `<div><span class="meta">Łącznie</span><b>${minutes(s.totalMinutes, s.waitAtLeast)}</b></div>` : ''}
-				<div><span class="meta">${travelLabel(s)}</span><b>${minutes(s.travelMinutes)}</b></div>
-				${s.totalMinutes != null ? `<div><span class="meta">Do lekarza</span><b>${wait(s)}</b></div>` : ''}
-				<div><span class="meta">Pacjentów na SOR</span><b>${s.patientsPresent ?? '?'}</b></div>
-			</div>
-			<span class="badge ${cls}">${label}${s.dataGeneratedAt ? ' · ' + ago(s.dataGeneratedAt) : ''}</span>
-			${s.lastError ? `<span class="meta"> ostatni błąd: ${esc(s.lastError)}</span>` : ''}
-			${stages ? `<details><summary>Etapy kolejki</summary><table>${stages}</table></details>` : ''}
-			<div class="meta">
-				<a href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}" target="_blank" rel="noopener">Nawiguj</a>
-				${phones(s.phone)}
-			</div>
-		</article>`;
-	}
-
-	function render({ranked, withoutData, sorTypesKnown}) {
-		markers.clearLayers();
-		L.circleMarker([origin.lat, origin.lng], {radius: 7, color: '#1565c0'}).addTo(markers).bindTooltip('Ty');
-		let html = sorTypesKnown ? '' : '<p class="warning">Nie wczytaliśmy jeszcze rejestru SOR dla dzieci — '
-			+ 'na liście mogą być SOR dziecięce, które nie przyjmują dorosłych.</p>';
-		html += ranked.map((s, i) => card(s, `${i + 1}. ${esc(s.hospitalName)}`)).join('');
-		if (withoutData.length) {
-			html += `<h3 class="section">${ranked.length
-				? 'Bliżej, ale bez aktualnych danych o kolejce'
-				: 'Brak aktualnych danych o kolejkach — najbliższe SOR'}</h3>`
-				+ '<p class="meta section-note">Nie wiemy, ile się tam czeka. Przed wyjazdem warto zadzwonić.</p>'
-				+ withoutData.map((s) => card(s, esc(s.hospitalName))).join('');
-		}
-		listEl.innerHTML = html || '<p class="meta">Nie znaleziono SOR w pobliżu.</p>';
-		ranked.forEach((s, i) => L.marker([s.lat, s.lng]).addTo(markers)
-			.bindTooltip(`${i + 1}. ${esc(s.hospitalName)} — ${minutes(s.totalMinutes, s.waitAtLeast)}`));
-		withoutData.forEach((s) => L.circleMarker([s.lat, s.lng], {radius: 8, color: '#888', fillOpacity: 0.5}).addTo(markers)
-			.bindTooltip(`${esc(s.hospitalName)} — brak aktualnych danych`));
-		const focus = [...ranked.slice(0, 5), ...withoutData.slice(0, 3)];
-		if (focus.length) map.fitBounds(L.latLngBounds([[origin.lat, origin.lng], ...focus.map((s) => [s.lat, s.lng])]).pad(0.2));
-	}
-
-	document.getElementById('locate').addEventListener('click', () => {
-		if (!navigator.geolocation) { statusEl.textContent = 'Przeglądarka nie udostępnia lokalizacji — kliknij na mapie.'; return; }
-		statusEl.textContent = 'Ustalam lokalizację…';
-		navigator.geolocation.getCurrentPosition(
-			(p) => { origin = {lat: p.coords.latitude, lng: p.coords.longitude}; load(); },
-			() => { statusEl.textContent = 'Nie udało się ustalić lokalizacji — kliknij na mapie.'; },
-			{enableHighAccuracy: true, timeout: 10000});
-	});
-	map.on('click', (e) => { origin = {lat: e.latlng.lat, lng: e.latlng.lng}; load(); });
-	priorityEl.addEventListener('change', load);
-	patientEl.addEventListener('change', load);
-</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"
+	integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g=="
+	crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="app.js"></script>
 </body>
 </html>

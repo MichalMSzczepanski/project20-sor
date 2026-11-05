@@ -1,8 +1,5 @@
 package io.github.michalmszczepanski.project20_sor.web;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ProblemDetail;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -33,11 +30,6 @@ class SorController {
 			throw new IllegalArgumentException("limit musi być w zakresie 1–" + MAX_LIMIT);
 		}
 		return RecommendationView.of(rankingService.recommend(new GeoPoint(lat, lng), priority, patient, limit));
-	}
-
-	@ExceptionHandler(IllegalArgumentException.class)
-	ProblemDetail badRequest(IllegalArgumentException ex) {
-		return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
 	}
 
 }

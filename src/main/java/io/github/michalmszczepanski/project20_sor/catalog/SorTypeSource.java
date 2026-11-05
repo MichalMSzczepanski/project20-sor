@@ -2,6 +2,7 @@ package io.github.michalmszczepanski.project20_sor.catalog;
 
 import java.util.Map;
 
+@FunctionalInterface
 public interface SorTypeSource {
 
 	/** @return rodzaj SOR według numeru kolejki (numer księgi rejestrowej + kod komórki, np. 000000007152-011) */

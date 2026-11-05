@@ -77,7 +77,7 @@ class TopsorQueueSourceTest {
 				{"t":1793900278,"data":null}
 				""");
 
-		assertThatThrownBy(() -> source.fetch(QUEUE_ID)).isInstanceOf(QueueFetchException.class)
+		assertThatThrownBy(() -> source.fetch(QUEUE_ID)).isInstanceOf(QueueNoDataException.class)
 				.hasMessageContaining("Brak danych");
 	}
 

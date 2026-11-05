@@ -9,7 +9,6 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.health.contributor.Health;
@@ -57,15 +56,11 @@ class HealthIndicatorsTest {
 			}
 			return new QueueSnapshot(id, at, NOW, 1, Map.of(), List.of());
 		}, store, CLOCK, new SorProperties(null, null, null,
-				new SorProperties.Queue(Duration.ofMinutes(5), Duration.ZERO, 1, Duration.ofMinutes(15)), null, null,
-				null));
+				new SorProperties.Queue(Duration.ofMinutes(5), Duration.ZERO, Duration.ZERO, Duration.ZERO,
+						Duration.ofMinutes(15), 1), null, null,
+				null, null, null));
 		queuesHealth = new SorQueuesHealthIndicator(catalog, store, poller,
 				new FreshnessPolicy(Duration.ofMinutes(15)), CLOCK, 0.5);
-	}
-
-	@AfterEach
-	void tearDown() {
-		poller.destroy();
 	}
 
 	@Test

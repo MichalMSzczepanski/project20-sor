@@ -11,7 +11,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** Bez harmonogramu — test nie może odpytywać pacjent.gov.pl. */
-@SpringBootTest(properties = "sor.scheduling.enabled=false")
+@SpringBootTest(properties = { "sor.scheduling.enabled=false", "sor.rpwdl.snapshot-file=target/test-no-snapshot.json" })
 @AutoConfigureMockMvc
 class Project20SorApplicationTests {
 

@@ -9,6 +9,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -89,8 +90,8 @@ class RpwdlSorTypeSourceTest {
 		try (ZipOutputStream zip = new ZipOutputStream(bytes)) {
 			for (String file : files) {
 				zip.putNextEntry(new ZipEntry(file));
-				zip.write(file.equals("Info.txt")
-						? "Raport wygenerowany na podstawie danych w systemie RPWDL".getBytes()
+				zip.write("Info.txt".equals(file)
+						? "Raport wygenerowany na podstawie danych w systemie RPWDL".getBytes(StandardCharsets.UTF_8)
 						: new ClassPathResource("fixtures/rpwdl/" + file).getContentAsByteArray());
 				zip.closeEntry();
 			}

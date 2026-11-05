@@ -8,8 +8,15 @@ import io.github.michalmszczepanski.project20_sor.catalog.SorUnit;
 import io.github.michalmszczepanski.project20_sor.geo.TravelEstimate;
 import io.github.michalmszczepanski.project20_sor.queue.QueueState;
 
+/**
+ * @param queueState stan kolejki; {@code null}, gdy jeszcze nic o niej nie wiemy — patrz {@link #queue()}
+ */
 public record SorRanking(SorUnit unit, SorType type, TravelEstimate travel, WaitEstimate waitEstimate,
-		Optional<QueueState> queue) {
+		QueueState queueState) {
+
+	public Optional<QueueState> queue() {
+		return Optional.ofNullable(queueState);
+	}
 
 	/** Dla SOR ze świeżym szacunkiem: najkrótszy łączny czas dojazdu i oczekiwania. */
 	static final Comparator<SorRanking> SHORTEST_TOTAL = Comparator

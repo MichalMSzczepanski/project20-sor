@@ -15,11 +15,15 @@ import io.github.michalmszczepanski.project20_sor.ranking.SorRanking;
 import io.github.michalmszczepanski.project20_sor.ranking.WaitEstimate;
 
 /** Kształt odpowiedzi API — oddzielony od modelu, żeby zmiany w domenie nie zmieniały kontraktu. */
-record SorRankingView(String queueId, SorType sorType, String hospitalName, String unitName, String address, String voivodeship,
+record SorRankingView(String queueId, SorType sorType, String hospitalName, String unitName, String city, String address, String voivodeship,
 		String phone, String notes, double lat, double lng, double distanceKm, int travelMinutes,
-		TravelEstimate.Method travelMethod, Integer waitMinutes,
+		TravelEstimate.Method travelMethod, Integer waitMinutes, WaitRangeView waitRange,
 		boolean waitAtLeast, WaitEstimate.Freshness freshness, Instant dataGeneratedAt, Integer totalMinutes,
 		Integer patientsPresent, List<StageView> stages, String lastError) {
+
+	/** Rozrzut czasu do lekarza zależny od priorytetu, gdy priorytet jest nieznany. */
+	record WaitRangeView(int fromMinutes, int toMinutes, boolean toAtLeast) {
+	}
 
 	record StageView(String name, Integer patients, String waitText, Integer waitMinutes) {
 	}
@@ -28,10 +32,12 @@ record SorRankingView(String queueId, SorType sorType, String hospitalName, Stri
 		SorUnit unit = ranking.unit();
 		WaitEstimate wait = ranking.waitEstimate();
 		Optional<QueueSnapshot> snapshot = ranking.queue().flatMap(QueueState::latestSnapshot);
-		return new SorRankingView(unit.queueId(), ranking.type(), unit.hospitalName(), unit.unitName(), unit.address().formatted(),
+		return new SorRankingView(unit.queueId(), ranking.type(), unit.hospitalName(), unit.unitName(), unit.address().city(), unit.address().formatted(),
 				unit.voivodeship(), unit.phone(), unit.notes(), unit.location().lat(), unit.location().lng(),
 				Math.round(ranking.travel().distanceKm() * 10) / 10.0, ranking.travel().minutes(),
 				ranking.travel().method(), wait.minutes(),
+				wait.range() == null ? null : new WaitRangeView(wait.range().fromMinutes(), wait.range().toMinutes(),
+						wait.range().toAtLeast()),
 				wait.atLeast(), wait.freshness(), wait.generatedAt(), ranking.totalMinutes().orElse(null),
 				snapshot.map(QueueSnapshot::patientsPresent).orElse(null), snapshot.map(SorRankingView::stages).orElse(List.of()),
 				ranking.queue().map(QueueState::lastError).orElse(null));

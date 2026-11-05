@@ -42,7 +42,7 @@ class TopsorQueueSource implements SorQueueSource {
 			throw new QueueFetchException("Brak czasu wygenerowania (t) dla " + queueId);
 		}
 		if (response.data() == null || response.data().isEmpty()) {
-			throw new QueueFetchException("Brak danych kolejki dla " + queueId);
+			throw new QueueNoDataException("Brak danych kolejki dla " + queueId);
 		}
 		Map<QueueStage, QueueSnapshot.Stage> stages = new EnumMap<>(QueueStage.class);
 		List<QueueSnapshot.Stage> otherStages = new ArrayList<>();

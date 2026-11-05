@@ -33,6 +33,18 @@ class HttpClientsConfig {
 	}
 
 	@Bean
+	RestClient nominatimRestClient(RestClient.Builder builder, SorProperties properties) {
+		SorProperties.Geocoding geocoding = properties.geocoding();
+		return client(builder, geocoding.baseUrl(), geocoding.timeout(), properties.pacjentGov().userAgent());
+	}
+
+	@Bean
+	RestClient transitousRestClient(RestClient.Builder builder, SorProperties properties) {
+		SorProperties.Transit transit = properties.transit();
+		return client(builder, transit.baseUrl(), transit.timeout(), properties.pacjentGov().userAgent());
+	}
+
+	@Bean
 	@ConditionalOnBooleanProperty("sor.travel.osrm.enabled")
 	RestClient osrmRestClient(RestClient.Builder builder, SorProperties properties) {
 		SorProperties.Osrm osrm = properties.travel().osrm();

@@ -101,7 +101,7 @@ class RankingServiceTest {
 		SorTypeRegistry notLoaded = new SorTypeRegistry(Map::of, Clock.fixed(NOW, ZoneOffset.UTC));
 		RankingService service = new RankingService(catalog, notLoaded, store, new StraightLineTravelEstimator(1.0, 60),
 				new WaitEstimator(new FreshnessPolicy(Duration.ofMinutes(15))), Clock.fixed(NOW, ZoneOffset.UTC),
-				new SorProperties.Ranking(40, 5));
+				new SorProperties.Ranking(40, 5, Duration.ofMinutes(30), Duration.ofMinutes(30), 3));
 
 		Recommendation recommendation = service.recommend(ORIGIN, null, PatientGroup.ADULT, 10);
 
@@ -139,13 +139,16 @@ class RankingServiceTest {
 	}
 
 	@Test
-	void sorsWithoutDataFartherThanRankedOnesAreNotListed() {
+	void sorsWithoutDataWithinReachAreListedOthersNot() {
+		// Jak w Gdańsku: najbliższy SOR z danymi 7 min, inne w pobliżu bez danych, jeden daleko (~69 min).
+		units = List.of(unit("near", 21.1), unit("middle", 21.2), unit("far", 21.3), unit("remote", 22.0));
+		catalog.refresh();
 		store.recordSnapshot(snapshot("near", NOW, "-", "-", "-"));
 
-		Recommendation recommendation = service(40, 5).recommend(ORIGIN, TriagePriority.MEDIUM, PatientGroup.ADULT, 10);
+		Recommendation recommendation = service(40, 5).recommend(ORIGIN, null, PatientGroup.ADULT, 10);
 
 		assertThat(recommendation.ranked()).extracting(r -> r.unit().queueId()).containsExactly("near");
-		assertThat(recommendation.withoutData()).isEmpty();
+		assertThat(recommendation.withoutData()).extracting(r -> r.unit().queueId()).containsExactly("middle", "far");
 	}
 
 	@Test
@@ -175,13 +178,96 @@ class RankingServiceTest {
 	}
 
 	@Test
-	void withoutPriorityCountsOnlyRegistrationAndTriage() {
-		store.recordSnapshot(snapshot("near", NOW, "3 min", "4 min", "powyżej 2 godzin"));
+	void withoutPriorityRanksByMediumAndShowsRange() {
+		// Jak na Wołoskiej 05.11.2026: rejestracja i triaż puste, po triażu 56 min (średni) i 178 min (niski).
+		store.recordSnapshot(snapshot("near", NOW, "-", "-", "56 min", "178 min", "-"));
+		store.recordSnapshot(snapshot("middle", NOW, "5 min", "5 min", "10 min", "20 min", "15 min"));
 
-		WaitEstimate wait = service(40, 5).recommend(ORIGIN, null, PatientGroup.ADULT, 1).ranked().get(0).waitEstimate();
+		List<SorRanking> ranked = service(40, 5).recommend(ORIGIN, null, PatientGroup.ADULT, 10).ranked();
 
-		assertThat(wait.minutes()).isEqualTo(7);
+		assertThat(ranked).extracting(r -> r.unit().queueId()).containsExactly("middle", "near");
+		WaitEstimate near = ranked.get(1).waitEstimate();
+		assertThat(near.minutes()).isEqualTo(56);
+		assertThat(near.range()).isEqualTo(new WaitEstimate.Range(0, 178, false));
+		assertThat(ranked.get(0).waitEstimate().range()).isEqualTo(new WaitEstimate.Range(20, 30, false));
+	}
+
+	@Test
+	void withPriorityGivesSingleValueWithoutRange() {
+		store.recordSnapshot(snapshot("near", NOW, "-", "-", "56 min", "178 min", "-"));
+
+		WaitEstimate wait = service(40, 5).recommend(ORIGIN, TriagePriority.LOW, PatientGroup.ADULT, 1).ranked()
+				.get(0).waitEstimate();
+
+		assertThat(wait.minutes()).isEqualTo(178);
+		assertThat(wait.range()).isNull();
+	}
+
+	@Test
+	void rangeKeepsAtLeastFlagOfLongestQueue() {
+		store.recordSnapshot(snapshot("near", NOW, "-", "-", "10 min", "powyżej 2 godzin", "-"));
+
+		WaitEstimate wait = service(40, 5).recommend(ORIGIN, null, PatientGroup.ADULT, 1).ranked().get(0)
+				.waitEstimate();
+
+		assertThat(wait.minutes()).isEqualTo(10);
 		assertThat(wait.atLeast()).isFalse();
+		assertThat(wait.range()).isEqualTo(new WaitEstimate.Range(0, 120, true));
+	}
+
+	@Test
+	void withoutPriorityMissingLowerQueueDropsOnlyRange() {
+		Map<QueueStage, QueueSnapshot.Stage> stages = new EnumMap<>(QueueStage.class);
+		stages.put(QueueStage.REGISTRATION, stage("-"));
+		stages.put(QueueStage.TRIAGE, stage("-"));
+		stages.put(QueueStage.PRIORITY_MEDIUM, stage("10 min"));
+		store.recordSnapshot(new QueueSnapshot("near", NOW, NOW, 1, stages, List.of()));
+
+		WaitEstimate wait = service(40, 5).recommend(ORIGIN, null, PatientGroup.ADULT, 10).ranked().get(0)
+				.waitEstimate();
+
+		assertThat(wait.minutes()).isEqualTo(10);
+		assertThat(wait.range()).isNull();
+	}
+
+	@Test
+	void farSorsLeaveMainRankingEvenWithShorterTotal() {
+		// Jak spod Julianowa: blisko długa kolejka, daleko (~69 min jazdy) pusto.
+		units = List.of(unit("near", 21.1), unit("remote", 22.0));
+		catalog.refresh();
+		store.recordSnapshot(snapshot("near", NOW, "-", "-", "60 min"));
+		store.recordSnapshot(snapshot("remote", NOW, "-", "-", "-"));
+
+		Recommendation recommendation = service(40, 5).recommend(ORIGIN, TriagePriority.MEDIUM, PatientGroup.ADULT, 10);
+
+		assertThat(recommendation.ranked()).extracting(r -> r.unit().queueId()).containsExactly("near");
+		// near: 7 + 60 = 67; remote: ~69 + 0 — nie oszczędza 30 min, więc nie pokazujemy go wcale
+		assertThat(recommendation.fartherFaster()).isEmpty();
+	}
+
+	@Test
+	void farSorSavingEnoughIsShownSeparately() {
+		units = List.of(unit("near", 21.1), unit("remote", 22.0));
+		catalog.refresh();
+		store.recordSnapshot(snapshot("near", NOW, "-", "-", "powyżej 2 godzin"));
+		store.recordSnapshot(snapshot("remote", NOW, "-", "-", "-"));
+
+		Recommendation recommendation = service(40, 5).recommend(ORIGIN, TriagePriority.MEDIUM, PatientGroup.ADULT, 10);
+
+		assertThat(recommendation.ranked()).extracting(r -> r.unit().queueId()).containsExactly("near");
+		assertThat(recommendation.fartherFaster()).extracting(r -> r.unit().queueId()).containsExactly("remote");
+	}
+
+	@Test
+	void sorsWithinExtraTravelCompeteOnTotal() {
+		// near 7 min, far 21 min jazdy: różnica 14 min mieści się w 30 — wygrywa krótszy łączny czas.
+		store.recordSnapshot(snapshot("near", NOW, "-", "-", "40 min"));
+		store.recordSnapshot(snapshot("far", NOW, "-", "-", "5 min"));
+
+		List<SorRanking> ranked = service(40, 5).recommend(ORIGIN, TriagePriority.MEDIUM, PatientGroup.ADULT, 10)
+				.ranked();
+
+		assertThat(ranked).extracting(r -> r.unit().queueId()).containsExactly("far", "near");
 	}
 
 	@Test
@@ -211,7 +297,8 @@ class RankingServiceTest {
 		// 60 km/h bez objazdu: minuty dojazdu ≈ kilometry
 		return new RankingService(catalog, sorTypes, store, new StraightLineTravelEstimator(1.0, 60),
 				new WaitEstimator(new FreshnessPolicy(Duration.ofMinutes(15))), Clock.fixed(NOW, ZoneOffset.UTC),
-				new SorProperties.Ranking(candidates, maxWithoutData));
+				new SorProperties.Ranking(candidates, maxWithoutData, Duration.ofMinutes(30),
+				Duration.ofMinutes(30), 3));
 	}
 
 	private static SorUnit unit(String queueId, double lng) {
@@ -219,12 +306,22 @@ class RankingServiceTest {
 				new GeoPoint(52.0, lng));
 	}
 
+	/** Jak w TOPSOR: wszystkie etapy; niepodane priorytety bez kolejki („-”). */
 	private static QueueSnapshot snapshot(String queueId, Instant generatedAt, String registration, String triage,
 			String medium) {
+		return snapshot(queueId, generatedAt, registration, triage, medium, "-", "-");
+	}
+
+	private static QueueSnapshot snapshot(String queueId, Instant generatedAt, String registration, String triage,
+			String medium, String low, String lowest) {
 		Map<QueueStage, QueueSnapshot.Stage> stages = new EnumMap<>(QueueStage.class);
 		stages.put(QueueStage.REGISTRATION, stage(registration));
 		stages.put(QueueStage.TRIAGE, stage(triage));
+		stages.put(QueueStage.PRIORITY_HIGHEST, stage("-"));
+		stages.put(QueueStage.PRIORITY_HIGH, stage("-"));
 		stages.put(QueueStage.PRIORITY_MEDIUM, stage(medium));
+		stages.put(QueueStage.PRIORITY_LOW, stage(low));
+		stages.put(QueueStage.PRIORITY_LOWEST, stage(lowest));
 		return new QueueSnapshot(queueId, generatedAt, NOW, 5, stages, List.of());
 	}
 

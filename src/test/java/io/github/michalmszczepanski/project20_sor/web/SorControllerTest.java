@@ -11,7 +11,6 @@ import java.time.Instant;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,16 +47,20 @@ class SorControllerTest {
 	@Test
 	void returnsRanking() throws Exception {
 		given(rankingService.recommend(any(GeoPoint.class), eq(TriagePriority.MEDIUM), eq(PatientGroup.ADULT), eq(5)))
-				.willReturn(new Recommendation(List.of(ranking()), List.of(), true));
+				.willReturn(new Recommendation(List.of(ranking()), List.of(), List.of(), true));
 
 		mvc.perform(get("/api/sor/nearest").param("lat", "51.2").param("lng", "15.5").param("priority", "MEDIUM")
 				.param("limit", "5"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.ranked[0].queueId").value("000000001137-014"))
+				.andExpect(jsonPath("$.ranked[0].city").value("BOLESŁAWIEC"))
 				.andExpect(jsonPath("$.ranked[0].address").value("Jeleniogórska 4, 59-700 BOLESŁAWIEC"))
 				.andExpect(jsonPath("$.ranked[0].distanceKm").value(7.3))
 				.andExpect(jsonPath("$.ranked[0].travelMinutes").value(11))
 				.andExpect(jsonPath("$.ranked[0].waitMinutes").value(2))
+				.andExpect(jsonPath("$.ranked[0].waitRange.fromMinutes").value(2))
+				.andExpect(jsonPath("$.ranked[0].waitRange.toMinutes").value(30))
+				.andExpect(jsonPath("$.fartherFaster").isEmpty())
 				.andExpect(jsonPath("$.ranked[0].totalMinutes").value(13))
 				.andExpect(jsonPath("$.ranked[0].freshness").value("FRESH"))
 				.andExpect(jsonPath("$.ranked[0].patientsPresent").value(18))
@@ -73,7 +76,7 @@ class SorControllerTest {
 	@Test
 	void passesPatientGroup() throws Exception {
 		given(rankingService.recommend(any(GeoPoint.class), eq(null), eq(PatientGroup.CHILD), eq(10)))
-				.willReturn(new Recommendation(List.of(), List.of(), true));
+				.willReturn(new Recommendation(List.of(), List.of(), List.of(), true));
 
 		mvc.perform(get("/api/sor/nearest").param("lat", "51").param("lng", "15").param("patient", "CHILD"))
 				.andExpect(status().isOk());
@@ -117,8 +120,8 @@ class SorControllerTest {
 		stages.put(QueueStage.REGISTRATION, new QueueSnapshot.Stage("Rejestracja", 3, new WaitTime(2, false, "2 min")));
 		QueueSnapshot snapshot = new QueueSnapshot(unit.queueId(), GENERATED, GENERATED, 18, stages, List.of());
 		return new SorRanking(unit, SorType.GENERAL, new TravelEstimate(7.26, 11, TravelEstimate.Method.ROAD),
-				new WaitEstimate(2, false, WaitEstimate.Freshness.FRESH, GENERATED),
-				Optional.of(new QueueState(snapshot, null, null)));
+				new WaitEstimate(2, false, new WaitEstimate.Range(2, 30, false), WaitEstimate.Freshness.FRESH, GENERATED),
+				new QueueState(snapshot, null, null));
 	}
 
 }

@@ -23,7 +23,7 @@ final class WaitTimeParser {
 			return new WaitTime(null, false, null);
 		}
 		String text = raw.trim().toLowerCase(Locale.ROOT);
-		if (text.equals("-")) {
+		if ("-".equals(text)) {
 			return new WaitTime(0, false, raw);
 		}
 		Matcher hours = HOURS.matcher(text);
