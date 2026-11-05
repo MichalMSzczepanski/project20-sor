@@ -29,21 +29,34 @@ class PacjentGovSorCatalogSource implements SorCatalogSource {
 
 	private final JsonMapper jsonMapper;
 
-	private final String path;
+	private final CatalogFileLocator locator;
+
+	private final String fallbackPath;
 
 	@Autowired
-	PacjentGovSorCatalogSource(RestClient pacjentGovRestClient, JsonMapper jsonMapper, SorProperties properties) {
-		this(pacjentGovRestClient, jsonMapper, properties.catalog().path());
+	PacjentGovSorCatalogSource(RestClient pacjentGovRestClient, JsonMapper jsonMapper, CatalogFileLocator locator,
+			SorProperties properties) {
+		this(pacjentGovRestClient, jsonMapper, locator, properties.catalog().path());
 	}
 
-	PacjentGovSorCatalogSource(RestClient restClient, JsonMapper jsonMapper, String path) {
+	PacjentGovSorCatalogSource(RestClient restClient, JsonMapper jsonMapper, CatalogFileLocator locator,
+			String fallbackPath) {
 		this.restClient = restClient;
 		this.jsonMapper = jsonMapper;
-		this.path = path;
+		this.locator = locator;
+		this.fallbackPath = fallbackPath;
 	}
 
 	@Override
-	public List<SorUnit> fetchAll() {
+	public SorCatalogData fetch() {
+		String path = locator.locate().orElseGet(() -> {
+			log.warn("Nie ustalono aktualnego pliku z listą SOR — używam ścieżki z konfiguracji {}", fallbackPath);
+			return fallbackPath;
+		});
+		return new SorCatalogData(path, fetchUnits(path));
+	}
+
+	private List<SorUnit> fetchUnits(String path) {
 		// Bajty, nie String: serwer plików nie musi podawać charsetu, a Jackson sam wykrywa UTF-8.
 		byte[] body = restClient.get().uri(path).retrieve().body(byte[].class);
 		if (body == null) {
@@ -61,7 +74,7 @@ class PacjentGovSorCatalogSource implements SorCatalogSource {
 				units.add(unit);
 			}
 		}
-		return List.copyOf(units);
+		return units;
 	}
 
 	private SorUnit toUnit(JsonNode node) {

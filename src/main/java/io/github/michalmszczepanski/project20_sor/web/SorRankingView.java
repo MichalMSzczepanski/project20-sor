@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import io.github.michalmszczepanski.project20_sor.catalog.SorType;
 import io.github.michalmszczepanski.project20_sor.catalog.SorUnit;
 import io.github.michalmszczepanski.project20_sor.geo.TravelEstimate;
 import io.github.michalmszczepanski.project20_sor.queue.QueueSnapshot;
@@ -14,7 +15,7 @@ import io.github.michalmszczepanski.project20_sor.ranking.SorRanking;
 import io.github.michalmszczepanski.project20_sor.ranking.WaitEstimate;
 
 /** Kształt odpowiedzi API — oddzielony od modelu, żeby zmiany w domenie nie zmieniały kontraktu. */
-record SorRankingView(String queueId, String hospitalName, String unitName, String address, String voivodeship,
+record SorRankingView(String queueId, SorType sorType, String hospitalName, String unitName, String address, String voivodeship,
 		String phone, String notes, double lat, double lng, double distanceKm, int travelMinutes,
 		TravelEstimate.Method travelMethod, Integer waitMinutes,
 		boolean waitAtLeast, WaitEstimate.Freshness freshness, Instant dataGeneratedAt, Integer totalMinutes,
@@ -27,7 +28,7 @@ record SorRankingView(String queueId, String hospitalName, String unitName, Stri
 		SorUnit unit = ranking.unit();
 		WaitEstimate wait = ranking.waitEstimate();
 		Optional<QueueSnapshot> snapshot = ranking.queue().flatMap(QueueState::latestSnapshot);
-		return new SorRankingView(unit.queueId(), unit.hospitalName(), unit.unitName(), unit.address().formatted(),
+		return new SorRankingView(unit.queueId(), ranking.type(), unit.hospitalName(), unit.unitName(), unit.address().formatted(),
 				unit.voivodeship(), unit.phone(), unit.notes(), unit.location().lat(), unit.location().lng(),
 				Math.round(ranking.travel().distanceKm() * 10) / 10.0, ranking.travel().minutes(),
 				ranking.travel().method(), wait.minutes(),

@@ -1,15 +1,13 @@
 package io.github.michalmszczepanski.project20_sor.ranking;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import io.github.michalmszczepanski.project20_sor.config.SorProperties;
+import io.github.michalmszczepanski.project20_sor.queue.FreshnessPolicy;
 import io.github.michalmszczepanski.project20_sor.queue.QueueSnapshot;
 import io.github.michalmszczepanski.project20_sor.queue.QueueStage;
 import io.github.michalmszczepanski.project20_sor.queue.WaitTime;
@@ -21,15 +19,10 @@ import io.github.michalmszczepanski.project20_sor.queue.WaitTime;
 @Component
 public class WaitEstimator {
 
-	private final Duration staleAfter;
+	private final FreshnessPolicy freshnessPolicy;
 
-	@Autowired
-	public WaitEstimator(SorProperties properties) {
-		this(properties.queue().staleAfter());
-	}
-
-	WaitEstimator(Duration staleAfter) {
-		this.staleAfter = staleAfter;
+	public WaitEstimator(FreshnessPolicy freshnessPolicy) {
+		this.freshnessPolicy = freshnessPolicy;
 	}
 
 	public WaitEstimate estimate(Optional<QueueSnapshot> snapshot, TriagePriority priority, Instant now) {
@@ -37,9 +30,9 @@ public class WaitEstimator {
 			return WaitEstimate.NO_DATA;
 		}
 		QueueSnapshot s = snapshot.get();
-		WaitEstimate.Freshness freshness = Duration.between(s.generatedAt(), now).compareTo(staleAfter) > 0
-				? WaitEstimate.Freshness.STALE
-				: WaitEstimate.Freshness.FRESH;
+		WaitEstimate.Freshness freshness = freshnessPolicy.isFresh(s, now)
+				? WaitEstimate.Freshness.FRESH
+				: WaitEstimate.Freshness.STALE;
 
 		List<QueueStage> stages = new ArrayList<>(List.of(QueueStage.REGISTRATION, QueueStage.TRIAGE));
 		if (priority != null) {

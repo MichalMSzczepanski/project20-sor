@@ -5,6 +5,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
@@ -17,6 +18,8 @@ import tools.jackson.databind.json.JsonMapper;
 class PacjentGovSorCatalogSourceTest {
 
 	private static final String PATH = "/sites/pacjent/files/dane/Mapy-SOR-24.09-2026.json";
+
+	private static final String NEWER_PATH = "/sites/pacjent/files/dane/Mapy-SOR-05.11-2026.json";
 
 	@Test
 	void mapsValidEntriesAndSkipsBrokenOnes() {
@@ -47,15 +50,35 @@ class PacjentGovSorCatalogSourceTest {
 		assertThat(fetchWith(MediaType.APPLICATION_JSON).get(1).queueId()).isEqualTo("000000001137-014");
 	}
 
+	@Test
+	void usesFileFoundByLocator() {
+		SorCatalogData data = fetch(() -> Optional.of(NEWER_PATH), NEWER_PATH, MediaType.APPLICATION_JSON);
+
+		assertThat(data.source()).isEqualTo(NEWER_PATH);
+		assertThat(data.units()).hasSize(3);
+	}
+
+	@Test
+	void fallsBackToConfiguredPathWhenLocatorFails() {
+		SorCatalogData data = fetch(Optional::empty, PATH, MediaType.APPLICATION_JSON);
+
+		assertThat(data.source()).isEqualTo(PATH);
+	}
+
 	private static List<SorUnit> fetchWith(MediaType contentType) {
+		return fetch(() -> Optional.of(PATH), PATH, contentType).units();
+	}
+
+	private static SorCatalogData fetch(CatalogFileLocator locator, String expectedPath, MediaType contentType) {
 		RestClient.Builder builder = RestClient.builder().baseUrl("https://pacjent.gov.pl");
 		MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-		server.expect(requestTo("https://pacjent.gov.pl" + PATH))
+		server.expect(requestTo("https://pacjent.gov.pl" + expectedPath))
 				.andRespond(withSuccess(new ClassPathResource("fixtures/mapy-sor-sample.json"), contentType));
-		List<SorUnit> units = new PacjentGovSorCatalogSource(builder.build(), JsonMapper.builder().build(), PATH)
-				.fetchAll();
+		SorCatalogData data = new PacjentGovSorCatalogSource(builder.build(), JsonMapper.builder().build(), locator,
+				PATH)
+				.fetch();
 		server.verify();
-		return units;
+		return data;
 	}
 
 }

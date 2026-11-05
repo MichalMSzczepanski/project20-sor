@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.github.michalmszczepanski.project20_sor.catalog.SorCatalog;
+import io.github.michalmszczepanski.project20_sor.catalog.SorCatalogData;
 import io.github.michalmszczepanski.project20_sor.catalog.SorUnit;
 import io.github.michalmszczepanski.project20_sor.config.SorProperties;
 import io.github.michalmszczepanski.project20_sor.geo.GeoPoint;
@@ -40,7 +41,7 @@ class QueuePollerTest {
 	void setUp() {
 		// "a" występuje dwa razy — dwa SOR dzielące jedną kolejkę mają być odpytane raz
 		units = List.of(unit("a"), unit("a"), unit("b"));
-		catalog = new SorCatalog(() -> units);
+		catalog = new SorCatalog(() -> new SorCatalogData("test", units), Clock.fixed(NOW, ZoneOffset.UTC));
 		catalog.refresh();
 		SorQueueSource source = id -> {
 			calls.merge(id, 1, Integer::sum);
@@ -49,8 +50,9 @@ class QueuePollerTest {
 			}
 			return new QueueSnapshot(id, NOW, NOW, 1, Map.of(), List.of());
 		};
-		SorProperties properties = new SorProperties(null, null,
-				new SorProperties.Queue(Duration.ofMinutes(5), Duration.ZERO, 2, Duration.ofMinutes(15)), null, null);
+		SorProperties properties = new SorProperties(null, null, null,
+				new SorProperties.Queue(Duration.ofMinutes(5), Duration.ZERO, 2, Duration.ofMinutes(15)), null, null,
+				null);
 		poller = new QueuePoller(catalog, source, store, Clock.fixed(NOW, ZoneOffset.UTC), properties);
 	}
 
@@ -71,6 +73,19 @@ class QueuePollerTest {
 		assertThat(b.latestSnapshot()).isEmpty();
 		assertThat(b.lastError()).isEqualTo("HTTP 503");
 		assertThat(b.lastErrorAt()).isEqualTo(NOW);
+	}
+
+	@Test
+	void recordsSummaryOfLastPoll() {
+		failing.add("b");
+		assertThat(poller.lastPoll()).isEmpty();
+
+		poller.pollAll();
+
+		QueuePoller.PollSummary summary = poller.lastPoll().orElseThrow();
+		assertThat(summary.queues()).isEqualTo(2);
+		assertThat(summary.failures()).isEqualTo(1);
+		assertThat(summary.finishedAt()).isEqualTo(NOW);
 	}
 
 	@Test

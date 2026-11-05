@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import io.github.michalmszczepanski.project20_sor.catalog.SorCatalog;
+import io.github.michalmszczepanski.project20_sor.catalog.SorTypeRegistry;
 import io.github.michalmszczepanski.project20_sor.catalog.SorUnit;
 import io.github.michalmszczepanski.project20_sor.config.SorProperties;
 import io.github.michalmszczepanski.project20_sor.geo.GeoPoint;
@@ -24,6 +25,8 @@ public class RankingService {
 
 	private final SorCatalog catalog;
 
+	private final SorTypeRegistry sorTypes;
+
 	private final QueueStateStore queues;
 
 	private final TravelEstimator travelEstimator;
@@ -35,14 +38,15 @@ public class RankingService {
 	private final SorProperties.Ranking config;
 
 	@Autowired
-	public RankingService(SorCatalog catalog, QueueStateStore queues, TravelEstimator travelEstimator,
-			WaitEstimator waitEstimator, Clock clock, SorProperties properties) {
-		this(catalog, queues, travelEstimator, waitEstimator, clock, properties.ranking());
+	public RankingService(SorCatalog catalog, SorTypeRegistry sorTypes, QueueStateStore queues,
+			TravelEstimator travelEstimator, WaitEstimator waitEstimator, Clock clock, SorProperties properties) {
+		this(catalog, sorTypes, queues, travelEstimator, waitEstimator, clock, properties.ranking());
 	}
 
-	RankingService(SorCatalog catalog, QueueStateStore queues, TravelEstimator travelEstimator,
-			WaitEstimator waitEstimator, Clock clock, SorProperties.Ranking config) {
+	RankingService(SorCatalog catalog, SorTypeRegistry sorTypes, QueueStateStore queues,
+			TravelEstimator travelEstimator, WaitEstimator waitEstimator, Clock clock, SorProperties.Ranking config) {
 		this.catalog = catalog;
+		this.sorTypes = sorTypes;
 		this.queues = queues;
 		this.travelEstimator = travelEstimator;
 		this.waitEstimator = waitEstimator;
@@ -51,11 +55,13 @@ public class RankingService {
 	}
 
 	/** @param priority priorytet z triażu albo {@code null}, gdy nieznany */
-	public Recommendation recommend(GeoPoint origin, TriagePriority priority, int limit) {
+	public Recommendation recommend(GeoPoint origin, TriagePriority priority, PatientGroup patient, int limit) {
 		Instant now = clock.instant();
-		// Trasy liczymy tylko dla najbliższych w linii prostej — dalsze i tak nie wygrają, a zapytanie zostaje małe.
+		// Najpierw odrzucamy SOR, które pacjenta nie przyjmą, potem bierzemy najbliższe w linii prostej:
+		// trasy liczymy tylko dla nich — dalsze i tak nie wygrają, a zapytanie zostaje małe.
 		List<SorUnit> candidates = catalog.units()
 				.stream()
+				.filter(unit -> patient.accepts(sorTypes.typeOf(unit.queueId())))
 				.sorted(Comparator.comparingDouble(u -> origin.distanceKmTo(u.location())))
 				.limit(config.candidates())
 				.toList();
@@ -76,13 +82,13 @@ public class RankingService {
 				.sorted(SorRanking.SHORTEST_TRAVEL)
 				.limit(ranked.isEmpty() ? limit : config.maxWithoutData())
 				.toList();
-		return new Recommendation(ranked, withoutData);
+		return new Recommendation(ranked, withoutData, sorTypes.isLoaded());
 	}
 
 	private SorRanking rank(SorUnit unit, TravelEstimate travel, TriagePriority priority, Instant now) {
 		Optional<QueueState> queue = queues.find(unit.queueId());
 		WaitEstimate wait = waitEstimator.estimate(queue.flatMap(QueueState::latestSnapshot), priority, now);
-		return new SorRanking(unit, travel, wait, queue);
+		return new SorRanking(unit, sorTypes.typeOf(unit.queueId()), travel, wait, queue);
 	}
 
 }

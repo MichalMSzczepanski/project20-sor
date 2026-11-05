@@ -5,7 +5,8 @@ import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties("sor")
-public record SorProperties(PacjentGov pacjentGov, Catalog catalog, Queue queue, Travel travel, Ranking ranking) {
+public record SorProperties(PacjentGov pacjentGov, Catalog catalog, Rpwdl rpwdl, Queue queue, Travel travel,
+		Ranking ranking, Health health) {
 
 	/**
 	 * @param baseUrl   adres portalu pacjent.gov.pl
@@ -16,11 +17,23 @@ public record SorProperties(PacjentGov pacjentGov, Catalog catalog, Queue queue,
 	}
 
 	/**
-	 * @param path            ścieżka pliku z listą SOR (data w nazwie zmienia się przy aktualizacji)
+	 * @param pagePath        strona z mapą SOR — z niej odczytujemy aktualną ścieżkę pliku z listą
+	 * @param path            ścieżka zapasowa, gdy ze strony nie da się jej odczytać
 	 * @param refreshInterval co ile odświeżać listę
 	 * @param retryInterval   co ile ponawiać, dopóki listy nie udało się wczytać ani razu
 	 */
-	public record Catalog(String path, Duration refreshInterval, Duration retryInterval) {
+	public record Catalog(String pagePath, String path, Duration refreshInterval, Duration retryInterval) {
+	}
+
+	/**
+	 * @param baseUrl         serwer RPWDL
+	 * @param exportPath      otwarty eksport CSV podmiotów leczniczych (ZIP ~35 MB, link z dane.gov.pl)
+	 * @param timeout         limit czasu pobierania eksportu
+	 * @param refreshInterval co ile odświeżać (rodzaje SOR zmieniają się rzadko)
+	 * @param retryInterval   co ile ponawiać, dopóki nie udało się wczytać ani razu
+	 */
+	public record Rpwdl(String baseUrl, String exportPath, Duration timeout, Duration refreshInterval,
+			Duration retryInterval) {
 	}
 
 	/**
@@ -53,6 +66,12 @@ public record SorProperties(PacjentGov pacjentGov, Catalog catalog, Queue queue,
 	 * @param maxWithoutData ile bliższych SOR bez aktualnych danych pokazać obok rankingu
 	 */
 	public record Ranking(int candidates, int maxWithoutData) {
+	}
+
+	/**
+	 * @param minFreshShare poniżej jakiego udziału kolejek ze świeżymi danymi serwis uznajemy za niesprawny
+	 */
+	public record Health(double minFreshShare) {
 	}
 
 }

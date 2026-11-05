@@ -35,6 +35,9 @@
 		.times { display: flex; gap: 16px; margin: 8px 0; flex-wrap: wrap; }
 		.times b { display: block; font-size: 18px; }
 		.badge { font-size: 12px; padding: 2px 6px; border-radius: 6px; border: 1px solid currentColor; }
+		.kids { color: #6a1b9a; border-color: #6a1b9a; font-weight: 600; vertical-align: middle; }
+		@media (prefers-color-scheme: dark) { .kids { color: #ce93d8; border-color: #ce93d8; } }
+		.warning { margin: 0 0 10px; padding: 8px 10px; border: 1px solid var(--warn); border-radius: 8px; color: var(--warn); }
 		.fresh { color: var(--ok); } .stale { color: var(--warn); } .nodata { color: var(--muted); }
 		details { font-size: 13px; } table { border-collapse: collapse; } td { padding: 1px 10px 1px 0; }
 		a { color: inherit; }
@@ -49,6 +52,12 @@
 </header>
 <div class="controls">
 	<button class="primary" id="locate">📍 Użyj mojej lokalizacji</button>
+	<label>Pacjent:
+		<select id="patient">
+			<option value="ADULT">dorosły</option>
+			<option value="CHILD">dziecko</option>
+		</select>
+	</label>
 	<label>Priorytet z triażu:
 		<select id="priority">
 			<option value="">nie wiem</option>
@@ -75,6 +84,7 @@
 	const statusEl = document.getElementById('status');
 	const listEl = document.getElementById('list');
 	const priorityEl = document.getElementById('priority');
+	const patientEl = document.getElementById('patient');
 	let origin = null;
 
 	const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'})[c]);
@@ -98,7 +108,7 @@
 	async function load() {
 		if (!origin) return;
 		statusEl.textContent = 'Szukam…';
-		const params = new URLSearchParams({lat: origin.lat, lng: origin.lng, limit: 10});
+		const params = new URLSearchParams({lat: origin.lat, lng: origin.lng, limit: 10, patient: patientEl.value});
 		if (priorityEl.value) params.set('priority', priorityEl.value);
 		try {
 			const res = await fetch('/api/sor/nearest?' + params);
@@ -119,7 +129,7 @@
 		const [cls, label] = FRESHNESS[s.freshness];
 		const stages = s.stages.map((st) => `<tr><td>${esc(st.name)}</td><td>${st.patients ?? '?'} os.</td><td>${esc(st.waitText)}</td></tr>`).join('');
 		return `<article class="card">
-			<h2>${title}</h2>
+			<h2>${title}${s.sorType === 'PEDIATRIC' ? ' <span class="badge kids">SOR dla dzieci</span>' : ''}</h2>
 			<div class="meta">${esc(s.address)}${s.notes ? ' · ' + esc(s.notes) : ''}</div>
 			<div class="times">
 				${s.totalMinutes != null ? `<div><span class="meta">Łącznie</span><b>${minutes(s.totalMinutes, s.waitAtLeast)}</b></div>` : ''}
@@ -137,10 +147,12 @@
 		</article>`;
 	}
 
-	function render({ranked, withoutData}) {
+	function render({ranked, withoutData, sorTypesKnown}) {
 		markers.clearLayers();
 		L.circleMarker([origin.lat, origin.lng], {radius: 7, color: '#1565c0'}).addTo(markers).bindTooltip('Ty');
-		let html = ranked.map((s, i) => card(s, `${i + 1}. ${esc(s.hospitalName)}`)).join('');
+		let html = sorTypesKnown ? '' : '<p class="warning">Nie wczytaliśmy jeszcze rejestru SOR dla dzieci — '
+			+ 'na liście mogą być SOR dziecięce, które nie przyjmują dorosłych.</p>';
+		html += ranked.map((s, i) => card(s, `${i + 1}. ${esc(s.hospitalName)}`)).join('');
 		if (withoutData.length) {
 			html += `<h3 class="section">${ranked.length
 				? 'Bliżej, ale bez aktualnych danych o kolejce'
@@ -167,6 +179,7 @@
 	});
 	map.on('click', (e) => { origin = {lat: e.latlng.lat, lng: e.latlng.lng}; load(); });
 	priorityEl.addEventListener('change', load);
+	patientEl.addEventListener('change', load);
 </script>
 </body>
 </html>

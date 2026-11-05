@@ -3,11 +3,13 @@ package io.github.michalmszczepanski.project20_sor.ranking;
 import java.util.Comparator;
 import java.util.Optional;
 
+import io.github.michalmszczepanski.project20_sor.catalog.SorType;
 import io.github.michalmszczepanski.project20_sor.catalog.SorUnit;
 import io.github.michalmszczepanski.project20_sor.geo.TravelEstimate;
 import io.github.michalmszczepanski.project20_sor.queue.QueueState;
 
-public record SorRanking(SorUnit unit, TravelEstimate travel, WaitEstimate waitEstimate, Optional<QueueState> queue) {
+public record SorRanking(SorUnit unit, SorType type, TravelEstimate travel, WaitEstimate waitEstimate,
+		Optional<QueueState> queue) {
 
 	/** Dla SOR ze świeżym szacunkiem: najkrótszy łączny czas dojazdu i oczekiwania. */
 	static final Comparator<SorRanking> SHORTEST_TOTAL = Comparator

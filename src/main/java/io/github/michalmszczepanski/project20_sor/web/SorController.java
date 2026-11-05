@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import io.github.michalmszczepanski.project20_sor.geo.GeoPoint;
+import io.github.michalmszczepanski.project20_sor.ranking.PatientGroup;
 import io.github.michalmszczepanski.project20_sor.ranking.RankingService;
 import io.github.michalmszczepanski.project20_sor.ranking.TriagePriority;
 
@@ -26,11 +27,12 @@ class SorController {
 
 	@GetMapping("/nearest")
 	RecommendationView nearest(@RequestParam double lat, @RequestParam double lng,
-			@RequestParam(required = false) TriagePriority priority, @RequestParam(defaultValue = "10") int limit) {
+			@RequestParam(required = false) TriagePriority priority,
+			@RequestParam(defaultValue = "ADULT") PatientGroup patient, @RequestParam(defaultValue = "10") int limit) {
 		if (limit < 1 || limit > MAX_LIMIT) {
 			throw new IllegalArgumentException("limit musi być w zakresie 1–" + MAX_LIMIT);
 		}
-		return RecommendationView.of(rankingService.recommend(new GeoPoint(lat, lng), priority, limit));
+		return RecommendationView.of(rankingService.recommend(new GeoPoint(lat, lng), priority, patient, limit));
 	}
 
 	@ExceptionHandler(IllegalArgumentException.class)

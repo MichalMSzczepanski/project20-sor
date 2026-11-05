@@ -27,6 +27,12 @@ class HttpClientsConfig {
 	}
 
 	@Bean
+	RestClient rpwdlRestClient(RestClient.Builder builder, SorProperties properties) {
+		SorProperties.Rpwdl rpwdl = properties.rpwdl();
+		return client(builder, rpwdl.baseUrl(), rpwdl.timeout(), properties.pacjentGov().userAgent());
+	}
+
+	@Bean
 	@ConditionalOnBooleanProperty("sor.travel.osrm.enabled")
 	RestClient osrmRestClient(RestClient.Builder builder, SorProperties properties) {
 		SorProperties.Osrm osrm = properties.travel().osrm();

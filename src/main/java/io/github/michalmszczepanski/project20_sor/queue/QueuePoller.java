@@ -1,7 +1,10 @@
 package io.github.michalmszczepanski.project20_sor.queue;
 
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -32,6 +35,8 @@ public class QueuePoller implements DisposableBean {
 
 	private final ExecutorService executor;
 
+	private volatile PollSummary lastPoll;
+
 	public QueuePoller(SorCatalog catalog, SorQueueSource source, QueueStateStore store, Clock clock,
 			SorProperties properties) {
 		this.catalog = catalog;
@@ -48,6 +53,7 @@ public class QueuePoller implements DisposableBean {
 			return;
 		}
 		store.retainOnly(queueIds);
+		Instant startedAt = clock.instant();
 		AtomicInteger failures = new AtomicInteger();
 		List<Callable<Void>> tasks = queueIds.stream().<Callable<Void>>map(id -> () -> {
 			if (!pollOne(id)) {
@@ -62,7 +68,16 @@ public class QueuePoller implements DisposableBean {
 			Thread.currentThread().interrupt();
 			return;
 		}
+		Instant finishedAt = clock.instant();
+		lastPoll = new PollSummary(finishedAt, Duration.between(startedAt, finishedAt), queueIds.size(), failures.get());
 		log.info("Odpytano {} kolejek SOR, błędów: {}", queueIds.size(), failures.get());
+	}
+
+	public Optional<PollSummary> lastPoll() {
+		return Optional.ofNullable(lastPoll);
+	}
+
+	public record PollSummary(Instant finishedAt, Duration took, int queues, int failures) {
 	}
 
 	private boolean pollOne(String queueId) {
